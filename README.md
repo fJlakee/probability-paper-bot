@@ -16,6 +16,22 @@ The first v3 milestone includes:
 
 The new components live in `strategy_v3.py` and `meta_model_v3.py`. They are disabled by default until a comparative v2/v3 walk-forward backtest is completed.
 
+Run the v3 walk-forward simulation against the same cached market history:
+
+```powershell
+paperbot backtest-v3 --config config.yml
+```
+
+It retrains one global model every seven days, generates only causal trend/breakout setups, chooses at most one position at a time, and applies each setup's ATR-normalized TP/SL. Reports are written as `v3_backtest_*` files in `reports/`.
+
+After both v2 and v3 have completed, generate a compact comparison:
+
+```powershell
+paperbot compare --config config.yml
+```
+
+The result is `reports/latest_v2_vs_v3.md`. Do not enable v3 forward trading based on a single profitable period; require repeatable results on untouched windows.
+
 Экспериментальный бот сканирует ликвидные бессрочные USDT-контракты Binance, оценивает вероятность того, что цена сначала коснётся заданного TP, а не SL, выбирает один лучший сигнал и ведёт **только виртуальную** позицию. В коде нет методов создания реальных ордеров и не нужны ключи Binance.
 
 ## Как устроен прогноз

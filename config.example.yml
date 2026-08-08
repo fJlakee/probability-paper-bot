@@ -96,3 +96,8 @@ v3:
   min_sl_pct: 0.002
   max_sl_pct: 0.005
   btc_adverse_return_limit: 0.01
+  min_entry_probability: 0.40
+  validation_signal_threshold: 0.40
+  min_calibration_samples: 500
+  min_validation_signals: 30
+  min_validation_precision: 0.40

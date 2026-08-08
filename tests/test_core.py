@@ -6,6 +6,8 @@ from paperbot.model import directional_barrier_labels, is_peg_like, triple_barri
 from paperbot.storage import Storage
 from paperbot.config import V3Config
 from paperbot.strategy_v3 import build_setup_frame, label_setups
+from paperbot.compare import compare_latest
+import json
 
 
 def test_triple_barrier_first_touch():
@@ -84,3 +86,11 @@ def test_v3_dynamic_barrier_label():
                           "high": [100, 101.1, 100], "low": [100, 99.9, 100],
                           "dynamic_tp_pct": [.01, .01, .01], "dynamic_sl_pct": [.004, .004, .004]})
     assert label_setups(frame, 2).iloc[0] == 1
+
+
+def test_compare_latest_reports(tmp_path):
+    (tmp_path / "backtest_summary_1.json").write_text(json.dumps({"trades": 2, "final_equity": 451}), encoding="utf-8")
+    (tmp_path / "v3_backtest_summary_1.json").write_text(json.dumps({"trades": 3, "final_equity": 452}), encoding="utf-8")
+    output = compare_latest(tmp_path)
+    text = output.read_text(encoding="utf-8")
+    assert "| trades | 2 | 3 |" in text
