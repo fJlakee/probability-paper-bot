@@ -10,7 +10,8 @@ from .backtest import WalkForwardBacktester
 from .config import Config
 from .execution import evaluate_bar, open_position
 from .meta_model_v3 import train_global_meta_model
-from .strategy_v3 import V3_FEATURES, build_global_meta_dataset, build_setup_frame
+from .strategy_v3 import (V3_FEATURES, build_global_meta_dataset, build_setup_frame,
+                          label_setup_outcomes)
 
 
 class V3WalkForwardBacktester:
@@ -26,11 +27,14 @@ class V3WalkForwardBacktester:
         closed = {s: df.iloc[:-1].copy() for s, df in frames.items() if len(df) > m.min_training_rows}
         if "BTCUSDT" not in closed:
             raise RuntimeError("BTCUSDT history is required for v3 market context")
-        setup_frames = {
-            symbol: build_setup_frame(df, closed["BTCUSDT"], v3).set_index("close_time")
-            for symbol, df in closed.items()
-        }
-        dataset = build_global_meta_dataset(closed, "BTCUSDT", v3, m.horizon_bars)
+        setup_frames = {}
+        for symbol, df in closed.items():
+            setup = build_setup_frame(df, closed["BTCUSDT"], v3)
+            outcomes = label_setup_outcomes(setup, v3.horizon_bars)
+            setup["target"] = outcomes.target
+            setup["gross_return"] = outcomes.gross_return
+            setup_frames[symbol] = setup.set_index("close_time")
+        dataset = build_global_meta_dataset(closed, "BTCUSDT", v3, v3.horizon_bars)
         if dataset.empty:
             raise RuntimeError("No v3 setups were generated")
 
@@ -44,11 +48,12 @@ class V3WalkForwardBacktester:
         trades, equity_curve = [], []
         next_retrain = times[0]
         fee_roundtrip = 2 * (e.taker_fee_rate + e.slippage_rate)
-        horizon_delta = pd.Timedelta(minutes=15 * m.horizon_bars)
+        horizon_delta = pd.Timedelta(minutes=15 * v3.horizon_bars)
+        setup_records = []
         diagnostics = {
             "setups_evaluated": 0, "pass_entry_probability": 0,
             "pass_expected_return": 0, "pass_calibration_samples": 0,
-            "pass_validation_signals": 0, "pass_validation_precision": 0,
+            "pass_validation_signals": 0, "pass_validation_mean_ev": 0,
             "inside_liquidation_distance": 0, "fully_eligible": 0,
             "max_calibrated_probability": 0.0,
         }
@@ -62,7 +67,7 @@ class V3WalkForwardBacktester:
                     model = train_global_meta_model(training, m.calibration_fraction,
                                                     m.test_fraction,
                                                     v3.validation_signal_threshold,
-                                                    m.random_state)
+                                                    m.random_state, fee_roundtrip)
                     print(f"v3 backtest {ts}: trained global model on {len(training)} setups", flush=True)
                 except ValueError as exc:
                     model = None
@@ -79,7 +84,7 @@ class V3WalkForwardBacktester:
                     result = evaluate_bar(position, float(bar.high), float(bar.low), float(bar.close),
                                           e.taker_fee_rate, e.slippage_rate,
                                           e.liquidation_penalty_rate,
-                                          position.bars_open >= e.max_position_bars)
+                                          position.bars_open >= v3.horizon_bars)
                     if result:
                         reason, exit_price, pnl = result
                         equity = max(0.0, equity + pnl)
@@ -120,32 +125,43 @@ class V3WalkForwardBacktester:
                 diagnostics["setups_evaluated"] += 1
                 diagnostics["max_calibrated_probability"] = max(
                     diagnostics["max_calibrated_probability"], float(row.probability))
-                liquidation_distance = 1 / e.leverage - e.maintenance_margin_rate
+                liquidation_distance = 1 / v3.simulation_leverage - e.maintenance_margin_rate
+                validation_ev_ok = model.test_mean_ev >= v3.min_validation_mean_ev
                 gates = [
                     row.probability >= v3.min_entry_probability,
                     row.expected_return >= e.min_expected_return_on_equity,
                     model.calibration_samples >= v3.min_calibration_samples,
                     model.test_signals >= v3.min_validation_signals,
-                    model.test_precision >= v3.min_validation_precision,
-                    row.dynamic_sl_pct < liquidation_distance,
+                    validation_ev_ok, row.dynamic_sl_pct < liquidation_distance,
                 ]
                 for key, passed in zip(("pass_entry_probability", "pass_expected_return",
                                         "pass_calibration_samples", "pass_validation_signals",
-                                        "pass_validation_precision", "inside_liquidation_distance"), gates):
+                                        "pass_validation_mean_ev", "inside_liquidation_distance"), gates):
                     diagnostics[key] += int(passed)
                 if all(gates):
                     diagnostics["fully_eligible"] += 1
+                setup_records.append({
+                    "signal_time": ts.isoformat(), "symbol": row.symbol,
+                    "side": "LONG" if int(row.setup_side) == 1 else "SHORT",
+                    "probability": float(row.probability), "expected_return": float(row.expected_return),
+                    "tp_pct": float(row.dynamic_tp_pct), "sl_pct": float(row.dynamic_sl_pct),
+                    "gross_return": float(row.gross_return) if pd.notna(row.gross_return) else None,
+                    "net_return": float(row.gross_return - fee_roundtrip) if pd.notna(row.gross_return) else None,
+                    "validation_mean_ev": model.test_mean_ev,
+                    "validation_ev_lower_bound": model.test_ev_lower_bound,
+                    "validation_brier": model.test_brier_score,
+                })
             eligible = candidates[
                 (candidates.probability >= v3.min_entry_probability)
                 & (candidates.expected_return >= e.min_expected_return_on_equity)
-                & (candidates.dynamic_sl_pct < 1 / e.leverage - e.maintenance_margin_rate)
+                & (candidates.dynamic_sl_pct < 1 / v3.simulation_leverage - e.maintenance_margin_rate)
             ]
             if (not eligible.empty and model.calibration_samples >= v3.min_calibration_samples
                     and model.test_signals >= v3.min_validation_signals
-                    and model.test_precision >= v3.min_validation_precision):
+                    and model.test_mean_ev >= v3.min_validation_mean_ev):
                 best = eligible.sort_values(["expected_return", "probability"], ascending=False).iloc[0]
                 side = "LONG" if int(best.setup_side) == 1 else "SHORT"
-                position = open_position(best.symbol, side, float(best.close), equity, e.leverage,
+                position = open_position(best.symbol, side, float(best.close), equity, v3.simulation_leverage,
                                          e.notional_fraction, float(best.dynamic_tp_pct),
                                          float(best.dynamic_sl_pct), e.taker_fee_rate,
                                          e.slippage_rate, e.maintenance_margin_rate,
@@ -158,8 +174,28 @@ class V3WalkForwardBacktester:
         summary_path = self.report_dir / f"v3_backtest_summary_{stamp}.json"
         pd.DataFrame(trades).to_csv(trades_path, index=False)
         pd.DataFrame(equity_curve).to_csv(self.report_dir / f"v3_backtest_equity_{stamp}.csv", index=False)
+        setups_frame = pd.DataFrame(setup_records)
+        setups_frame.to_csv(self.report_dir / f"v3_setup_diagnostics_{stamp}.csv", index=False)
         summary = WalkForwardBacktester(cfg, self.report_dir)._summary(trades, equity, diagnostics)
         summary["strategy"] = "v3-meta-label"
+        summary["simulation_leverage"] = v3.simulation_leverage
+        summary["horizon_bars"] = v3.horizon_bars
+        if not setups_frame.empty:
+            positive = setups_frame[setups_frame.expected_return > 0]
+            summary["shadow_positive_ev"] = {
+                "setups": len(positive),
+                "mean_realized_return": float(positive.net_return.mean()) if len(positive) else None,
+                "win_rate": float((positive.net_return > 0).mean()) if len(positive) else None,
+            }
+            bins = pd.cut(setups_frame.probability, bins=[0, .2, .25, .3, .35, .4, .5, 1], include_lowest=True)
+            calibration = setups_frame.assign(probability_bin=bins).groupby("probability_bin", observed=True).agg(
+                setups=("symbol", "count"), mean_probability=("probability", "mean"),
+                success_rate=("net_return", lambda x: float((x > 0).mean())),
+                mean_net_return=("net_return", "mean"))
+            summary["calibration_bins"] = {
+                str(index): {k: (int(v) if k == "setups" else float(v)) for k, v in row.items()}
+                for index, row in calibration.to_dict("index").items()
+            }
         summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(json.dumps(summary, indent=2), flush=True)
         return trades_path, summary_path

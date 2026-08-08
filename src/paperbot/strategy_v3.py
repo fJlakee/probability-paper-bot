@@ -50,7 +50,12 @@ def build_setup_frame(raw: pd.DataFrame, btc_raw: pd.DataFrame | None, cfg: V3Co
 
 def label_setups(frame: pd.DataFrame, horizon: int) -> pd.Series:
     """Meta-label: 1 when a setup's dynamic TP is touched before its dynamic SL."""
+    return label_setup_outcomes(frame, horizon)["target"]
+
+
+def label_setup_outcomes(frame: pd.DataFrame, horizon: int) -> pd.DataFrame:
     labels = pd.Series(np.nan, index=frame.index, dtype=float)
+    returns = pd.Series(np.nan, index=frame.index, dtype=float)
     highs, lows = frame.high.to_numpy(), frame.low.to_numpy()
     for i in np.flatnonzero(frame.setup_side.to_numpy() != 0):
         if i + horizon >= len(frame):
@@ -59,6 +64,7 @@ def label_setups(frame: pd.DataFrame, horizon: int) -> pd.Series:
         entry = float(frame.close.iloc[i])
         tp, sl = float(frame.dynamic_tp_pct.iloc[i]), float(frame.dynamic_sl_pct.iloc[i])
         labels.iloc[i] = 0.0
+        returns.iloc[i] = side * (float(frame.close.iloc[i + horizon]) / entry - 1)
         for j in range(i + 1, i + horizon + 1):
             if side == 1:
                 hit_tp, hit_sl = highs[j] >= entry * (1 + tp), lows[j] <= entry * (1 - sl)
@@ -66,8 +72,9 @@ def label_setups(frame: pd.DataFrame, horizon: int) -> pd.Series:
                 hit_tp, hit_sl = lows[j] <= entry * (1 - tp), highs[j] >= entry * (1 + sl)
             if hit_tp or hit_sl:
                 labels.iloc[i] = float(hit_tp and not hit_sl)
+                returns.iloc[i] = tp if hit_tp and not hit_sl else -sl
                 break
-    return labels
+    return pd.DataFrame({"target": labels, "gross_return": returns})
 
 
 def build_global_meta_dataset(frames: dict[str, pd.DataFrame], btc_symbol: str,
@@ -76,7 +83,9 @@ def build_global_meta_dataset(frames: dict[str, pd.DataFrame], btc_symbol: str,
     parts = []
     for symbol, raw in frames.items():
         setup = build_setup_frame(raw, btc, cfg)
-        setup["target"] = label_setups(setup, horizon)
+        outcomes = label_setup_outcomes(setup, horizon)
+        setup["target"] = outcomes.target
+        setup["gross_return"] = outcomes.gross_return
         setup["symbol"] = symbol
         selected = setup[setup.setup_side != 0].dropna(subset=V3_FEATURES + ["target"])
         if not selected.empty:

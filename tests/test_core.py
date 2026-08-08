@@ -5,7 +5,7 @@ from paperbot.execution import evaluate_bar, open_position
 from paperbot.model import directional_barrier_labels, is_peg_like, triple_barrier_labels
 from paperbot.storage import Storage
 from paperbot.config import V3Config
-from paperbot.strategy_v3 import build_setup_frame, label_setups
+from paperbot.strategy_v3 import build_setup_frame, label_setup_outcomes, label_setups
 from paperbot.compare import compare_latest
 import json
 
@@ -86,6 +86,15 @@ def test_v3_dynamic_barrier_label():
                           "high": [100, 101.1, 100], "low": [100, 99.9, 100],
                           "dynamic_tp_pct": [.01, .01, .01], "dynamic_sl_pct": [.004, .004, .004]})
     assert label_setups(frame, 2).iloc[0] == 1
+
+
+def test_v3_outcomes_keep_realized_barrier_return():
+    frame = pd.DataFrame({"setup_side": [-1, 0, 0], "close": [100, 100, 100],
+                          "high": [100, 100.2, 100], "low": [100, 98.9, 100],
+                          "dynamic_tp_pct": [.01, .01, .01], "dynamic_sl_pct": [.004, .004, .004]})
+    outcome = label_setup_outcomes(frame, 2)
+    assert outcome.target.iloc[0] == 1
+    assert outcome.gross_return.iloc[0] == pytest.approx(.01)
 
 
 def test_compare_latest_reports(tmp_path):

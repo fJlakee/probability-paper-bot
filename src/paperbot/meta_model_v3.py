@@ -16,6 +16,9 @@ class GlobalMetaModel:
     test_precision: float
     test_signals: int
     calibration_samples: int
+    test_mean_ev: float
+    test_ev_lower_bound: float
+    test_brier_score: float
 
     def predict_probability(self, rows: pd.DataFrame) -> np.ndarray:
         raw = self.base_model.predict_proba(rows[V3_FEATURES])[:, 1]
@@ -24,7 +27,7 @@ class GlobalMetaModel:
 
 def train_global_meta_model(dataset: pd.DataFrame, calibration_fraction: float = 0.2,
                             test_fraction: float = 0.2, threshold: float = 0.5,
-                            random_state: int = 42) -> GlobalMetaModel:
+                            random_state: int = 42, fee_roundtrip: float = 0.0) -> GlobalMetaModel:
     if len(dataset) < 500 or dataset.target.nunique() < 2:
         raise ValueError("At least 500 setup rows with both outcomes are required")
     n = len(dataset)
@@ -43,4 +46,13 @@ def train_global_meta_model(dataset: pd.DataFrame, calibration_fraction: float =
     calibrated = calibrator.predict_proba(raw_test.reshape(-1, 1))[:, 1]
     selected = calibrated >= threshold
     precision = float(test.target.to_numpy()[selected].mean()) if selected.any() else 0.0
-    return GlobalMetaModel(base, calibrator, precision, int(selected.sum()), len(calibration))
+    realized = test.gross_return.to_numpy() - fee_roundtrip
+    selected_returns = realized[selected]
+    mean_ev = float(selected_returns.mean()) if len(selected_returns) else float("-inf")
+    if len(selected_returns) > 1:
+        lower_bound = float(mean_ev - 1.645 * selected_returns.std(ddof=1) / np.sqrt(len(selected_returns)))
+    else:
+        lower_bound = float("-inf")
+    brier = float(np.mean((calibrated - test.target.to_numpy()) ** 2))
+    return GlobalMetaModel(base, calibrator, precision, int(selected.sum()), len(calibration),
+                           mean_ev, lower_bound, brier)

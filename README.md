@@ -12,7 +12,9 @@ The first v3 milestone includes:
 - BTC market-context and relative-strength features;
 - ATR-normalized TP/SL with explicit caps compatible with the liquidation model;
 - a pooled global dataset across assets;
-- a global gradient-boosting meta-model with separate temporal Platt calibration and test periods.
+- a global gradient-boosting meta-model with separate temporal Platt calibration and test periods;
+- validation by realized net expected value after fees, rather than precision alone;
+- an isolated v3 simulation leverage and horizon (10x and 24 bars by default).
 
 The new components live in `strategy_v3.py` and `meta_model_v3.py`. They are disabled by default until a comparative v2/v3 walk-forward backtest is completed.
 
@@ -22,7 +24,9 @@ Run the v3 walk-forward simulation against the same cached market history:
 paperbot backtest-v3 --config config.yml
 ```
 
-It retrains one global model every seven days, generates only causal trend/breakout setups, chooses at most one position at a time, and applies each setup's ATR-normalized TP/SL. Reports are written as `v3_backtest_*` files in `reports/`.
+It retrains one global model every seven days, generates only causal trend/breakout setups, chooses at most one position at a time, and applies each setup's ATR-normalized TP/SL. A trade must have positive predicted EV and the preceding untouched validation slice must also have non-negative realized mean EV. Reports are written as `v3_backtest_*`; every evaluated setup is also exported to `v3_setup_diagnostics_*` for calibration and rejection analysis.
+
+Zero trades is a valid safety result: it means the tested setup did not demonstrate an edge after estimated fees under the configured untouched period. Do not lower the gates merely to manufacture activity.
 
 After both v2 and v3 have completed, generate a compact comparison:
 

@@ -83,6 +83,8 @@ storage:
 
 v3:
   enabled: false
+  simulation_leverage: 10
+  horizon_bars: 24
   breakout_bars: 20
   ema_fast: 50
   ema_slow: 200
@@ -91,13 +93,13 @@ v3:
   max_atr_pct: 0.020
   tp_atr_multiple: 1.5
   sl_atr_multiple: 0.8
-  min_tp_pct: 0.004
-  max_tp_pct: 0.012
-  min_sl_pct: 0.002
-  max_sl_pct: 0.005
+  min_tp_pct: 0.006
+  max_tp_pct: 0.025
+  min_sl_pct: 0.003
+  max_sl_pct: 0.015
   btc_adverse_return_limit: 0.01
-  min_entry_probability: 0.40
-  validation_signal_threshold: 0.40
+  min_entry_probability: 0.35
+  validation_signal_threshold: 0.35
   min_calibration_samples: 500
   min_validation_signals: 30
-  min_validation_precision: 0.40
+  min_validation_mean_ev: 0.0

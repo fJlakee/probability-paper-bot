@@ -78,6 +78,8 @@ class StorageConfig:
 @dataclass
 class V3Config:
     enabled: bool = False
+    simulation_leverage: int = 10
+    horizon_bars: int = 24
     breakout_bars: int = 20
     ema_fast: int = 50
     ema_slow: int = 200
@@ -86,16 +88,16 @@ class V3Config:
     max_atr_pct: float = 0.020
     tp_atr_multiple: float = 1.5
     sl_atr_multiple: float = 0.8
-    min_tp_pct: float = 0.004
-    max_tp_pct: float = 0.012
-    min_sl_pct: float = 0.002
-    max_sl_pct: float = 0.005
+    min_tp_pct: float = 0.006
+    max_tp_pct: float = 0.025
+    min_sl_pct: float = 0.003
+    max_sl_pct: float = 0.015
     btc_adverse_return_limit: float = 0.01
-    min_entry_probability: float = 0.40
-    validation_signal_threshold: float = 0.40
+    min_entry_probability: float = 0.35
+    validation_signal_threshold: float = 0.35
     min_calibration_samples: int = 500
     min_validation_signals: int = 30
-    min_validation_precision: float = 0.40
+    min_validation_mean_ev: float = 0.0
 
 
 @dataclass
@@ -130,6 +132,6 @@ def load_config(path: str | Path) -> Config:
         raise ValueError("TP and SL must be positive")
     if cfg.model.calibration_fraction + cfg.model.test_fraction >= 0.5:
         raise ValueError("calibration_fraction + test_fraction must leave at least 50% for training")
-    if cfg.v3.max_sl_pct >= 1 / cfg.execution.leverage - cfg.execution.maintenance_margin_rate:
+    if cfg.v3.max_sl_pct >= 1 / cfg.v3.simulation_leverage - cfg.execution.maintenance_margin_rate:
         raise ValueError("v3.max_sl_pct must stay inside estimated isolated liquidation distance")
     return cfg
