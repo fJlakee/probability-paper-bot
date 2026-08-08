@@ -1,0 +1,31 @@
+[project]
+name = "probability-paper-bot"
+version = "2.0.0"
+description = "Probability-driven Binance Futures paper trading experiment"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27,<1",
+  "joblib>=1.4,<2",
+  # joblib 1.5.3 still triggers a NumPy 2.5 shape-assignment deprecation while loading models.
+  "numpy>=1.26,<2.5",
+  "pandas>=2.2,<3",
+  "PyYAML>=6.0,<7",
+  "scikit-learn>=1.5,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+paperbot = "paperbot.cli:main"
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

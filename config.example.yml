@@ -1,0 +1,82 @@
+binance:
+  base_url: "https://fapi.binance.com"
+  interval: "15m"
+  history_bars: 17280  # 180 days of 15-minute candles
+  universe_size: 100
+  download_workers: 10
+  incremental_bars: 5
+  universe_refresh_minutes: 60
+  quote_asset: "USDT"
+  symbol_allowlist: []
+  symbol_denylist:
+    - USUSDT
+    - USDCUSDT
+    - FDUSDUSDT
+    - TUSDUSDT
+    - USD1USDT
+    - USDGUSDT
+    - USDPUSDT
+    - DAIUSDT
+    - BUSDUSDT
+    - USDSUSDT
+    - USDEUSDT
+    - PYUSDUSDT
+    - EURIUSDT
+    - AEURUSDT
+    - GHOUSDT
+    - CRVUSDUSDT
+    - USD0USDT
+    - USTCUSDT
+    - LUSDUSDT
+    - FRAXUSDT
+    - SUSDEUSDT
+    - USDTBUSDT
+  exclude_peg_like: true
+  peg_price_min: 0.95
+  peg_price_max: 1.05
+  peg_max_atr_pct: 0.003
+
+model:
+  horizon_bars: 12
+  take_profit_pct: 0.010
+  stop_loss_pct: 0.004
+  min_entry_probability: 0.70
+  validation_signal_threshold: 0.55
+  min_training_rows: 400
+  calibration_fraction: 0.20
+  test_fraction: 0.20
+  min_calibration_samples: 200
+  min_validation_trades: 100
+  min_validation_precision: 0.52
+  random_state: 42
+  retrain_minutes: 360
+  prefilter_size: 25
+  model_workers: 4
+  backtest_training_days: 90
+  backtest_retrain_days: 7
+  backtest_universe_size: 25
+
+execution:
+  initial_capital: 450.0
+  leverage: 100
+  # Итоговый номинал позиции = equity * notional_fraction, уже с учётом плеча.
+  # При equity=$450, fraction=1 и leverage=100: notional=$450, margin=$4.50.
+  notional_fraction: 1.0
+  taker_fee_rate: 0.0005
+  slippage_rate: 0.0002
+  maintenance_margin_rate: 0.004
+  funding_rate_per_8h: 0.0001
+  scan_seconds: 60
+  max_position_bars: 12
+  min_expected_return_on_equity: 0.0001
+  liquidation_penalty_rate: 0.002
+
+telegram:
+  enabled: false
+  bot_token: ""  # Set TELEGRAM_BOT_TOKEN in the environment.
+  chat_id: ""  # Set TELEGRAM_CHAT_ID in the environment.
+
+storage:
+  database: "paperbot.sqlite3"
+  model_directory: "models"
+  report_directory: "reports"

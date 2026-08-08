@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.sqlite3
+config.yml
+models/
+reports/
+*.egg-info/
+build/
+dist/
+.coverage
