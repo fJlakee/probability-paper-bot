@@ -1,4 +1,20 @@
-# Probability Paper Bot v2
+# Probability Paper Bot v3 (development)
+
+Stable `v2.0.0` remains available on the `main` branch and Git tag. The `v3` development branch adds a trend/breakout meta-labeling pipeline without changing the stable paper trader yet.
+
+## v3 direction
+
+The first v3 milestone includes:
+
+- causal 20-bar breakout setups;
+- EMA 50/200 trend and slope filters;
+- volume and volatility filters;
+- BTC market-context and relative-strength features;
+- ATR-normalized TP/SL with explicit caps compatible with the liquidation model;
+- a pooled global dataset across assets;
+- a global gradient-boosting meta-model with separate temporal Platt calibration and test periods.
+
+The new components live in `strategy_v3.py` and `meta_model_v3.py`. They are disabled by default until a comparative v2/v3 walk-forward backtest is completed.
 
 Экспериментальный бот сканирует ликвидные бессрочные USDT-контракты Binance, оценивает вероятность того, что цена сначала коснётся заданного TP, а не SL, выбирает один лучший сигнал и ведёт **только виртуальную** позицию. В коде нет методов создания реальных ордеров и не нужны ключи Binance.
 

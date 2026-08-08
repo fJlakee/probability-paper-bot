@@ -1,6 +1,6 @@
 [project]
 name = "probability-paper-bot"
-version = "2.0.0"
+version = "3.0.0.dev0"
 description = "Probability-driven Binance Futures paper trading experiment"
 requires-python = ">=3.11"
 dependencies = [

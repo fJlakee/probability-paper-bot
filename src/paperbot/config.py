@@ -76,12 +76,31 @@ class StorageConfig:
 
 
 @dataclass
+class V3Config:
+    enabled: bool = False
+    breakout_bars: int = 20
+    ema_fast: int = 50
+    ema_slow: int = 200
+    min_volume_z: float = 0.5
+    min_atr_pct: float = 0.0015
+    max_atr_pct: float = 0.020
+    tp_atr_multiple: float = 1.5
+    sl_atr_multiple: float = 0.8
+    min_tp_pct: float = 0.004
+    max_tp_pct: float = 0.012
+    min_sl_pct: float = 0.002
+    max_sl_pct: float = 0.005
+    btc_adverse_return_limit: float = 0.01
+
+
+@dataclass
 class Config:
     binance: BinanceConfig
     model: ModelConfig
     execution: ExecutionConfig
     telegram: TelegramConfig
     storage: StorageConfig
+    v3: V3Config
 
 
 def load_config(path: str | Path) -> Config:
@@ -96,6 +115,7 @@ def load_config(path: str | Path) -> Config:
         execution=ExecutionConfig(**raw.get("execution", {})),
         telegram=TelegramConfig(**telegram),
         storage=StorageConfig(**raw.get("storage", {})),
+        v3=V3Config(**raw.get("v3", {})),
     )
     if not 0 < cfg.execution.notional_fraction <= 1:
         raise ValueError("execution.notional_fraction must be in (0, 1]")

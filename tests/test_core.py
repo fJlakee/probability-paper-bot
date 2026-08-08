@@ -4,6 +4,8 @@ from types import SimpleNamespace
 from paperbot.execution import evaluate_bar, open_position
 from paperbot.model import directional_barrier_labels, is_peg_like, triple_barrier_labels
 from paperbot.storage import Storage
+from paperbot.config import V3Config
+from paperbot.strategy_v3 import build_setup_frame, label_setups
 
 
 def test_triple_barrier_first_touch():
@@ -60,3 +62,25 @@ def test_prediction_journal_deduplicates_same_candle(tmp_path):
     assert len(storage.unresolved_predictions()) == 1
     storage.resolve_prediction(storage.unresolved_predictions()[0]["id"], 1, 123)
     assert storage.unresolved_predictions() == []
+
+
+def test_v3_breakout_uses_prior_bars_only():
+    n = 260
+    times = pd.date_range("2026-01-01", periods=n, freq="15min", tz="UTC")
+    close = pd.Series([100 + i * .02 for i in range(n)], dtype=float)
+    close.iloc[-1] += 3
+    volume = pd.Series([100 + (i % 7) for i in range(n)], dtype=float)
+    volume.iloc[-1] = 1000
+    df = pd.DataFrame({"open_time": times, "close_time": times + pd.Timedelta(minutes=15),
+                       "open": close - .01, "high": close + .05, "low": close - .05,
+                       "close": close, "volume": volume, "quote_volume": volume * close,
+                       "taker_quote": volume * close * .55})
+    setup = build_setup_frame(df, None, V3Config(min_atr_pct=.0001))
+    assert setup.setup_side.iloc[-1] == 1
+
+
+def test_v3_dynamic_barrier_label():
+    frame = pd.DataFrame({"setup_side": [1, 0, 0], "close": [100, 100, 100],
+                          "high": [100, 101.1, 100], "low": [100, 99.9, 100],
+                          "dynamic_tp_pct": [.01, .01, .01], "dynamic_sl_pct": [.004, .004, .004]})
+    assert label_setups(frame, 2).iloc[0] == 1

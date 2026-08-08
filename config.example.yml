@@ -80,3 +80,19 @@ storage:
   database: "paperbot.sqlite3"
   model_directory: "models"
   report_directory: "reports"
+
+v3:
+  enabled: false
+  breakout_bars: 20
+  ema_fast: 50
+  ema_slow: 200
+  min_volume_z: 0.5
+  min_atr_pct: 0.0015
+  max_atr_pct: 0.020
+  tp_atr_multiple: 1.5
+  sl_atr_multiple: 0.8
+  min_tp_pct: 0.004
+  max_tp_pct: 0.012
+  min_sl_pct: 0.002
+  max_sl_pct: 0.005
+  btc_adverse_return_limit: 0.01
