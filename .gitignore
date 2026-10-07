@@ -9,3 +9,12 @@ reports/
 build/
 dist/
 .coverage
+.env
+.env.*
+!.env.example
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+*.pem
+*.key
